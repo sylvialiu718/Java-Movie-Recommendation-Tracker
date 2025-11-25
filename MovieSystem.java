@@ -306,9 +306,7 @@ class UserFileHandler {
 }
 
 class PasswordEncoder {
-    // 简单的自定义加密 - 符合第11条要求
     public static String encodePassword(String rawPassword) {
-        // 基本的字符移位加密
         char[] chars = rawPassword.toCharArray();
         for (int i = 0; i < chars.length; i++) {
             chars[i] = (char) (chars[i] + (i % 7) + 3);
@@ -317,7 +315,6 @@ class PasswordEncoder {
     }
 
     public static boolean verifyPassword(String rawPassword, String storedPassword) {
-        // 对输入密码进行相同的加密然后比较
         String encodedInput = encodePassword(rawPassword);
         return encodedInput.equals(storedPassword);
     }
@@ -486,7 +483,6 @@ public class MovieSystem {
 
     public List<Movie> getTopRatedMovies(int count) {
         List<Movie> sortedMovies = new ArrayList<>(movies);
-        // 使用传统的排序方法替代stream
         for (int i = 0; i < sortedMovies.size() - 1; i++) {
             for (int j = i + 1; j < sortedMovies.size(); j++) {
                 if (sortedMovies.get(i).getRating() < sortedMovies.get(j).getRating()) {
@@ -515,7 +511,6 @@ public class MovieSystem {
 
         System.out.println("\nMovies by genre:");
         List<String> genres = new ArrayList<>(genreMap.keySet());
-        // 手动排序替代stream
         for (int i = 0; i < genres.size() - 1; i++) {
             for (int j = i + 1; j < genres.size(); j++) {
                 if (genreMap.get(genres.get(i)).size() < genreMap.get(genres.get(j)).size()) {
@@ -639,7 +634,6 @@ public class MovieSystem {
 
     public void displayMoviesSortedByYear() {
         List<Movie> sortedMovies = new ArrayList<>(movies);
-        // 手动排序替代stream
         for (int i = 0; i < sortedMovies.size() - 1; i++) {
             for (int j = i + 1; j < sortedMovies.size(); j++) {
                 if (sortedMovies.get(i).getYear() < sortedMovies.get(j).getYear()) {
