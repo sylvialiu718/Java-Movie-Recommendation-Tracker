@@ -1,21 +1,340 @@
-import java.io.BufferedReader;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
-import java.io.IOException;
+import java.io.*;
 import java.util.*;
+
+class Watchlist {
+    private List<String> movieIds;
+
+    public Watchlist() {
+        this.movieIds = new ArrayList<>();
+    }
+
+    public Watchlist(List<String> movieIds) {
+        this.movieIds = new ArrayList<>(movieIds);
+    }
+
+    public boolean addMovie(String movieId) {
+        if (movieId == null || movieId.trim().isEmpty()) {
+            System.out.println("Movie ID cannot be empty");
+            return false;
+        }
+        movieId = movieId.trim();
+        if (movieIds.contains(movieId)) {
+            System.out.println("The movie is already in the watchlist");
+            return false;
+        }
+        return movieIds.add(movieId);
+    }
+
+    public boolean removeMovie(String movieId) {
+        if (movieId == null || movieId.trim().isEmpty()) {
+            System.out.println("Movie ID cannot be empty");
+            return false;
+        }
+        movieId = movieId.trim();
+        if (!movieIds.contains(movieId)) {
+            System.out.println("The movie is not in the watchlist");
+            return false;
+        }
+        return movieIds.remove(movieId);
+    }
+
+    public List<String> getMovieIds() {
+        return new ArrayList<>(movieIds);
+    }
+
+    public String toCsvString() {
+        return String.join(",", movieIds);
+    }
+}
+
+class History {
+    private List<String> movieIds;
+
+    public History() {
+        this.movieIds = new ArrayList<>();
+    }
+
+    public History(List<String> movieIds) {
+        this.movieIds = new ArrayList<>(movieIds);
+    }
+
+    public boolean addWatchedMovie(String movieId) {
+        if (movieId == null || movieId.trim().isEmpty()) {
+            System.out.println("Movie ID cannot be empty");
+            return false;
+        }
+        movieId = movieId.trim();
+        if (movieIds.contains(movieId)) {
+            System.out.println("The movie is already in the history");
+            return false;
+        }
+        return movieIds.add(movieId);
+    }
+
+    public List<String> getWatchedMovieIds() {
+        return new ArrayList<>(movieIds);
+    }
+
+    public String toCsvString() {
+        return String.join(",", movieIds);
+    }
+}
+
+class User {
+    private String username;
+    private String password;
+    private Watchlist watchlist;
+    private History history;
+
+    public User(String username, String rawPassword) {
+        this.username = username;
+        this.password = PasswordEncoder.encodePassword(rawPassword);
+        this.watchlist = new Watchlist();
+        this.history = new History();
+    }
+
+    public User(String username, String encryptedPassword, List<String> watchlistIds, List<String> historyIds) {
+        this.username = username;
+        this.password = encryptedPassword;
+        this.watchlist = new Watchlist(watchlistIds);
+        this.history = new History(historyIds);
+    }
+
+    public String getUsername() { return username; }
+    public String getPassword() { return password; }
+    public Watchlist getWatchlist() { return watchlist; }
+    public History getHistory() { return history; }
+
+    public void changePassword(String newRawPassword) {
+        this.password = PasswordEncoder.encodePassword(newRawPassword);
+    }
+
+    public String toCsvLine() {
+        String watchlistStr = watchlist.toCsvString();
+        String historyStr = history.toCsvString();
+        return String.format("%s,%s,%s,%s", username, password, watchlistStr, historyStr);
+    }
+}
+
+class UserAuthentication {
+    private UserFileHandler fileHandler;
+    private Map<String, User> userData;
+    private User currentUser;
+
+    public UserAuthentication() {
+        fileHandler = new UserFileHandler();
+        try {
+            userData = fileHandler.readAllUsers();
+        } catch (Exception e) {
+            System.out.println("User data initialization failed: " + e.getMessage());
+            userData = new HashMap<>();
+        }
+    }
+
+    public boolean register(String username, String password) {
+        if (username == null || username.trim().isEmpty() || password == null || password.trim().isEmpty()) {
+            System.out.println("Username and password cannot be empty");
+            return false;
+        }
+
+        username = username.trim();
+        if (userData.containsKey(username)) {
+            System.out.println("Username already exists");
+            return false;
+        }
+
+        User newUser = new User(username, password);
+        userData.put(username, newUser);
+
+        try {
+            fileHandler.writeAllUsers(userData);
+            System.out.println("Registration successful! Please login.");
+            return true;
+        } catch (Exception e) {
+            System.out.println("Registration failed: " + e.getMessage());
+            userData.remove(username);
+            return false;
+        }
+    }
+
+    public boolean login(String username, String password) {
+        if (username == null || username.trim().isEmpty() || password == null || password.trim().isEmpty()) {
+            System.out.println("Username and password cannot be empty");
+            return false;
+        }
+
+        username = username.trim();
+        String inputPassword = password.trim();
+
+        if (!userData.containsKey(username)) {
+            System.out.println("Username does not exist");
+            return false;
+        }
+
+        User user = userData.get(username);
+        boolean passwordMatch = PasswordEncoder.verifyPassword(inputPassword, user.getPassword());
+
+        if (passwordMatch) {
+            currentUser = user;
+            System.out.println("Login successful! Welcome, " + username + "!");
+            return true;
+        } else {
+            System.out.println("Incorrect password");
+            return false;
+        }
+    }
+
+    public void logout() {
+        if (currentUser != null) {
+            System.out.println("Goodbye, " + currentUser.getUsername() + "!");
+            currentUser = null;
+        }
+    }
+
+    public User getCurrentUser() {
+        return currentUser;
+    }
+
+    public boolean isLoggedIn() {
+        return currentUser != null;
+    }
+
+    public boolean saveUserChanges() {
+        if (currentUser == null) {
+            System.out.println("No user to save changes for");
+            return false;
+        }
+
+        try {
+            userData.put(currentUser.getUsername(), currentUser);
+            fileHandler.writeAllUsers(userData);
+            return true;
+        } catch (Exception e) {
+            System.out.println("Failed to save user data: " + e.getMessage());
+            return false;
+        }
+    }
+}
+
+class UserFileHandler {
+    private static final String USER_CSV_PATH = "users.csv";
+    private static final String CSV_HEADER = "Username,Password,Watchlist,History";
+
+    public Map<String, User> readAllUsers() throws IOException {
+        Map<String, User> users = new HashMap<>();
+        File file = new File(USER_CSV_PATH);
+
+        if (!file.exists()) {
+            createNewUserFile();
+            return users;
+        }
+
+        try (BufferedReader br = new BufferedReader(new FileReader(file))) {
+            String line;
+            boolean isHeader = true;
+
+            while ((line = br.readLine()) != null) {
+                if (isHeader) {
+                    isHeader = false;
+                    continue;
+                }
+                line = line.trim();
+                if (line.isEmpty()) continue;
+
+                try {
+                    User user = parseCsvLine(line);
+                    users.put(user.getUsername(), user);
+                } catch (IllegalArgumentException e) {
+                    System.out.println("Invalid CSV format in line: " + line);
+                }
+            }
+        }
+        return users;
+    }
+
+    public void writeAllUsers(Map<String, User> users) throws IOException {
+        try (BufferedWriter bw = new BufferedWriter(new FileWriter(USER_CSV_PATH))) {
+            bw.write(CSV_HEADER);
+            bw.newLine();
+            for (User user : users.values()) {
+                bw.write(user.toCsvLine());
+                bw.newLine();
+            }
+        }
+    }
+
+    private User parseCsvLine(String line) {
+        String[] fields = line.split(",", -1);
+        if (fields.length != 4) {
+            throw new IllegalArgumentException("Field count mismatch");
+        }
+
+        String username = fields[0].trim();
+        String password = fields[1].trim();
+        List<String> watchlistIds = parseIdList(fields[2].trim());
+        List<String> historyIds = parseIdList(fields[3].trim());
+
+        if (username.isEmpty() || password.isEmpty()) {
+            throw new IllegalArgumentException("Username/password cannot be empty");
+        }
+
+        return new User(username, password, watchlistIds, historyIds);
+    }
+
+    private List<String> parseIdList(String str) {
+        List<String> ids = new ArrayList<>();
+        if (!str.isEmpty()) {
+            String[] idArr = str.split(",");
+            for (String id : idArr) {
+                id = id.trim();
+                if (!id.isEmpty()) {
+                    ids.add(id);
+                }
+            }
+        }
+        return ids;
+    }
+
+    private void createNewUserFile() throws IOException {
+        File file = new File(USER_CSV_PATH);
+        file.createNewFile();
+        try (BufferedWriter bw = new BufferedWriter(new FileWriter(file))) {
+            bw.write(CSV_HEADER);
+            bw.newLine();
+        }
+    }
+}
+
+class PasswordEncoder {
+    // 简单的自定义加密 - 符合第11条要求
+    public static String encodePassword(String rawPassword) {
+        // 基本的字符移位加密
+        char[] chars = rawPassword.toCharArray();
+        for (int i = 0; i < chars.length; i++) {
+            chars[i] = (char) (chars[i] + (i % 7) + 3);
+        }
+        return new String(chars);
+    }
+
+    public static boolean verifyPassword(String rawPassword, String storedPassword) {
+        // 对输入密码进行相同的加密然后比较
+        String encodedInput = encodePassword(rawPassword);
+        return encodedInput.equals(storedPassword);
+    }
+}
 
 public class MovieSystem {
     private List<Movie> movies;
     private String movieFilePath;
     private Map<String, List<Movie>> genreMap;
-    private Scanner scanner;
+    private BufferedReader reader;
     private UserAuthentication userAuth;
 
     public MovieSystem() {
         this.movies = new ArrayList<>();
         this.movieFilePath = "movies.csv";
         this.genreMap = new HashMap<>();
-        this.scanner = new Scanner(System.in);
+        this.reader = new BufferedReader(new InputStreamReader(System.in));
         this.userAuth = new UserAuthentication();
         loadMovies();
         buildGenreMap();
@@ -100,7 +419,7 @@ public class MovieSystem {
     }
 
     private Movie parseMovieFromCsv(String csvLine) {
-        String[] parts = csvLine.split(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)", -1);
+        String[] parts = csvLine.split(",", -1);
 
         if (parts.length < 5) {
             System.out.println("Invalid movie data (insufficient columns): " + csvLine);
@@ -167,13 +486,16 @@ public class MovieSystem {
 
     public List<Movie> getTopRatedMovies(int count) {
         List<Movie> sortedMovies = new ArrayList<>(movies);
-        // 使用传统的排序方法
-        Collections.sort(sortedMovies, new Comparator<Movie>() {
-            @Override
-            public int compare(Movie m1, Movie m2) {
-                return Double.compare(m2.getRating(), m1.getRating());
+        // 使用传统的排序方法替代stream
+        for (int i = 0; i < sortedMovies.size() - 1; i++) {
+            for (int j = i + 1; j < sortedMovies.size(); j++) {
+                if (sortedMovies.get(i).getRating() < sortedMovies.get(j).getRating()) {
+                    Movie temp = sortedMovies.get(i);
+                    sortedMovies.set(i, sortedMovies.get(j));
+                    sortedMovies.set(j, temp);
+                }
             }
-        });
+        }
 
         List<Movie> result = new ArrayList<>();
         for (int i = 0; i < Math.min(count, sortedMovies.size()); i++) {
@@ -192,16 +514,20 @@ public class MovieSystem {
         System.out.println("Available genres: " + getAllGenres().size());
 
         System.out.println("\nMovies by genre:");
-        List<Map.Entry<String, List<Movie>>> genreEntries = new ArrayList<>(genreMap.entrySet());
-        Collections.sort(genreEntries, new Comparator<Map.Entry<String, List<Movie>>>() {
-            @Override
-            public int compare(Map.Entry<String, List<Movie>> e1, Map.Entry<String, List<Movie>> e2) {
-                return Integer.compare(e2.getValue().size(), e1.getValue().size());
+        List<String> genres = new ArrayList<>(genreMap.keySet());
+        // 手动排序替代stream
+        for (int i = 0; i < genres.size() - 1; i++) {
+            for (int j = i + 1; j < genres.size(); j++) {
+                if (genreMap.get(genres.get(i)).size() < genreMap.get(genres.get(j)).size()) {
+                    String temp = genres.get(i);
+                    genres.set(i, genres.get(j));
+                    genres.set(j, temp);
+                }
             }
-        });
+        }
 
-        for (Map.Entry<String, List<Movie>> entry : genreEntries) {
-            System.out.printf("  %-12s: %d movies%n", entry.getKey(), entry.getValue().size());
+        for (String genre : genres) {
+            System.out.printf("  %-12s: %d movies%n", genre, genreMap.get(genre).size());
         }
 
         int minYear = Integer.MAX_VALUE;
@@ -266,32 +592,37 @@ public class MovieSystem {
 
             System.out.println("\nNavigation: [N]ext page, [P]revious page, [G]o to page, [Q]uit");
             System.out.print("Enter your choice: ");
-            String choice = scanner.nextLine().trim().toLowerCase();
+            try {
+                String choice = reader.readLine().trim().toLowerCase();
 
-            switch (choice) {
-                case "n":
-                    if (currentPage < totalPages) currentPage++;
-                    break;
-                case "p":
-                    if (currentPage > 1) currentPage--;
-                    break;
-                case "g":
-                    System.out.print("Enter page number (1-" + totalPages + "): ");
-                    try {
-                        int page = Integer.parseInt(scanner.nextLine().trim());
-                        if (page >= 1 && page <= totalPages) {
-                            currentPage = page;
-                        } else {
-                            System.out.println("Invalid page number!");
+                switch (choice) {
+                    case "n":
+                        if (currentPage < totalPages) currentPage++;
+                        break;
+                    case "p":
+                        if (currentPage > 1) currentPage--;
+                        break;
+                    case "g":
+                        System.out.print("Enter page number (1-" + totalPages + "): ");
+                        try {
+                            int page = Integer.parseInt(reader.readLine().trim());
+                            if (page >= 1 && page <= totalPages) {
+                                currentPage = page;
+                            } else {
+                                System.out.println("Invalid page number!");
+                            }
+                        } catch (NumberFormatException e) {
+                            System.out.println("Please enter a valid number!");
                         }
-                    } catch (NumberFormatException e) {
-                        System.out.println("Please enter a valid number!");
-                    }
-                    break;
-                case "q":
-                    return;
-                default:
-                    System.out.println("Invalid choice! Please try again.");
+                        break;
+                    case "q":
+                        return;
+                    default:
+                        System.out.println("Invalid choice! Please try again.");
+                }
+            } catch (IOException e) {
+                System.out.println("Error reading input: " + e.getMessage());
+                return;
             }
         }
     }
@@ -308,12 +639,16 @@ public class MovieSystem {
 
     public void displayMoviesSortedByYear() {
         List<Movie> sortedMovies = new ArrayList<>(movies);
-        Collections.sort(sortedMovies, new Comparator<Movie>() {
-            @Override
-            public int compare(Movie m1, Movie m2) {
-                return Integer.compare(m2.getYear(), m1.getYear());
+        // 手动排序替代stream
+        for (int i = 0; i < sortedMovies.size() - 1; i++) {
+            for (int j = i + 1; j < sortedMovies.size(); j++) {
+                if (sortedMovies.get(i).getYear() < sortedMovies.get(j).getYear()) {
+                    Movie temp = sortedMovies.get(i);
+                    sortedMovies.set(i, sortedMovies.get(j));
+                    sortedMovies.set(j, temp);
+                }
             }
-        });
+        }
 
         System.out.println("\n=== Recent Movies (Sorted by Year) ===");
         System.out.println("==================================================================================================================");
@@ -330,6 +665,15 @@ public class MovieSystem {
         return movies.size();
     }
 
+    private String readInput() {
+        try {
+            return reader.readLine();
+        } catch (IOException e) {
+            System.out.println("Error reading input: " + e.getMessage());
+            return "";
+        }
+    }
+
     private void showAuthenticationMenu() {
         while (true) {
             System.out.println("\n=== User Authentication ===");
@@ -338,12 +682,12 @@ public class MovieSystem {
             System.out.println("3. Exit");
             System.out.print("Choose option: ");
 
-            String choice = scanner.nextLine().trim();
+            String choice = readInput().trim();
 
             switch (choice) {
                 case "1":
                     if (performLogin()) {
-                        return; // Login successful, proceed to main system
+                        return;
                     }
                     break;
                 case "2":
@@ -361,24 +705,24 @@ public class MovieSystem {
 
     private boolean performLogin() {
         System.out.print("Username: ");
-        String username = scanner.nextLine().trim();
+        String username = readInput().trim();
         System.out.print("Password: ");
-        String password = scanner.nextLine().trim();
+        String password = readInput().trim();
 
         return userAuth.login(username, password);
     }
 
     private void performRegistration() {
         System.out.print("Choose username: ");
-        String username = scanner.nextLine().trim();
+        String username = readInput().trim();
         System.out.print("Choose password: ");
-        String password = scanner.nextLine().trim();
+        String password = readInput().trim();
 
         userAuth.register(username, password);
     }
 
     public void startMainSystem() {
-        showAuthenticationMenu(); // This will now show the authentication menu
+        showAuthenticationMenu();
 
         System.out.println("Welcome, " + userAuth.getCurrentUser().getUsername() + "!");
         displayWelcomeMessage();
@@ -386,7 +730,7 @@ public class MovieSystem {
         boolean running = true;
         while (running) {
             displayMainMenu();
-            String choice = scanner.nextLine().trim();
+            String choice = readInput().trim();
 
             switch (choice) {
                 case "1":
@@ -428,7 +772,7 @@ public class MovieSystem {
 
             if (running) {
                 System.out.println("\nPress Enter to continue...");
-                scanner.nextLine();
+                readInput();
             }
         }
     }
@@ -443,7 +787,7 @@ public class MovieSystem {
         System.out.println("3. Remove movie from watchlist");
         System.out.print("Choose option: ");
 
-        String choice = scanner.nextLine().trim();
+        String choice = readInput().trim();
         switch (choice) {
             case "1":
                 List<String> watchlistIds = watchlist.getMovieIds();
@@ -461,7 +805,7 @@ public class MovieSystem {
                 break;
             case "2":
                 System.out.print("Enter movie ID to add: ");
-                String movieIdToAdd = scanner.nextLine().trim();
+                String movieIdToAdd = readInput().trim();
                 if (isValidMovieId(movieIdToAdd)) {
                     if (watchlist.addMovie(movieIdToAdd)) {
                         System.out.println("Movie added to watchlist.");
@@ -472,7 +816,7 @@ public class MovieSystem {
                 break;
             case "3":
                 System.out.print("Enter movie ID to remove: ");
-                String movieIdToRemove = scanner.nextLine().trim();
+                String movieIdToRemove = readInput().trim();
                 if (watchlist.removeMovie(movieIdToRemove)) {
                     System.out.println("Movie removed from watchlist.");
                 } else {
@@ -493,7 +837,7 @@ public class MovieSystem {
         System.out.println("2. Add movie to history");
         System.out.print("Choose option: ");
 
-        String choice = scanner.nextLine().trim();
+        String choice = readInput().trim();
         switch (choice) {
             case "1":
                 List<String> historyIds = history.getWatchedMovieIds();
@@ -511,7 +855,7 @@ public class MovieSystem {
                 break;
             case "2":
                 System.out.print("Enter movie ID to add to history: ");
-                String movieIdToAdd = scanner.nextLine().trim();
+                String movieIdToAdd = readInput().trim();
                 if (isValidMovieId(movieIdToAdd)) {
                     if (history.addWatchedMovie(movieIdToAdd)) {
                         System.out.println("Movie added to viewing history.");
@@ -538,7 +882,7 @@ public class MovieSystem {
             System.out.println("5. Exit");
             System.out.print("Choose an option: ");
 
-            String choice = scanner.nextLine();
+            String choice = readInput();
             switch (choice) {
                 case "1":
                     displayAllMovies();
@@ -593,7 +937,7 @@ public class MovieSystem {
 
     private void searchMovies() {
         System.out.print("\nEnter movie title to search: ");
-        String searchTerm = scanner.nextLine().trim();
+        String searchTerm = readInput().trim();
 
         if (searchTerm.isEmpty()) {
             System.out.println("Search term cannot be empty!");
@@ -613,7 +957,7 @@ public class MovieSystem {
 
     private void simpleSearchMovies() {
         System.out.print("Enter search term: ");
-        String term = scanner.nextLine();
+        String term = readInput();
         List<Movie> results = searchMoviesByTitle(term);
 
         if (results.isEmpty()) {
@@ -636,7 +980,7 @@ public class MovieSystem {
         }
 
         System.out.print("\nEnter genre name or number: ");
-        String input = scanner.nextLine().trim();
+        String input = readInput().trim();
 
         String selectedGenre;
         try {
@@ -666,7 +1010,7 @@ public class MovieSystem {
     private void simpleBrowseByGenre() {
         System.out.println("Available genres: " + String.join(", ", getAllGenres()));
         System.out.print("Enter genre: ");
-        String genre = scanner.nextLine();
+        String genre = readInput();
 
         List<Movie> movies = getMoviesByGenre(genre);
         if (movies.isEmpty()) {
@@ -687,12 +1031,16 @@ public class MovieSystem {
         System.out.println("2. Simple Movie Browser (no authentication)");
         System.out.print("Enter choice: ");
 
-        String mode = system.scanner.nextLine().trim();
+        try {
+            String mode = system.reader.readLine().trim();
 
-        if ("1".equals(mode)) {
-            system.startMainSystem();
-        } else {
-            system.startSimpleBrowser();
+            if ("1".equals(mode)) {
+                system.startMainSystem();
+            } else {
+                system.startSimpleBrowser();
+            }
+        } catch (IOException e) {
+            System.out.println("Error reading input: " + e.getMessage());
         }
     }
 }
