@@ -1,5 +1,9 @@
 import java.io.*;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.*;
+import java.util.stream.Collectors;
 
 class Watchlist {
     private List<String> movieIds;
@@ -774,11 +778,13 @@ public class MovieSystem {
     private void manageUserWatchlist() {
         User currentUser = userAuth.getCurrentUser();
         Watchlist watchlist = currentUser.getWatchlist();
+        History history = currentUser.getHistory();
 
         System.out.println("\n=== Manage Watchlist ===");
         System.out.println("1. View watchlist");
         System.out.println("2. Add movie to watchlist");
         System.out.println("3. Remove movie from watchlist");
+        System.out.println("4. Mark movie as watched");
         System.out.print("Choose option: ");
 
         String choice = readInput().trim();
@@ -815,6 +821,31 @@ public class MovieSystem {
                     System.out.println("Movie removed from watchlist.");
                 } else {
                     System.out.println("Movie not found in watchlist.");
+                }
+            case "4":
+                System.out.print("Enter movie ID to mark as watched: ");
+                String movieIdToWatch = readInput().trim();
+
+                if (!isValidMovieId(movieIdToWatch)) {
+                    System.out.println("Invalid movie ID:");
+                    break;
+                }
+
+
+                if (!watchlist.getMovieIds().contains(movieIdToWatch)) {
+                    System.out.println("Movie is not in your watchlist.");
+                    break;
+                }
+
+
+                watchlist.removeMovie(movieIdToWatch);
+                history.addWatchedMovie(movieIdToWatch);
+
+
+                if (userAuth.saveUserChanges()) {
+                    System.out.println("Movie marked as watched. Moved to viewing history.");
+                } else {
+                    System.out.println("Failed to save changes.");
                 }
                 break;
             default:
@@ -1036,5 +1067,224 @@ public class MovieSystem {
         } catch (IOException e) {
             System.out.println("Error reading input: " + e.getMessage());
         }
+    }
+
+}
+class RecommendEngine {
+    private List<Movie> movies;
+    private Map<String, List<Movie>> genreMap;
+    private Scanner scanner;
+
+    public RecommendEngine() {
+        this.movies = new ArrayList<>();
+        this.genreMap = new HashMap<>();
+        this.scanner = new Scanner(System.in);
+        loadMovies();
+        buildGenreMap();
+    }
+
+    static class Movie {
+        private String id;
+        private String title;
+        private String genre;
+        private double rating;
+        private LocalDate releaseDate;
+
+        public Movie(String id, String title, String genre, double rating, LocalDate releaseDate) {
+            this.id = id;
+            this.title = title;
+            this.genre = genre;
+            this.rating = rating;
+            this.releaseDate = releaseDate;
+        }
+
+        public String getId() { return id; }
+        public String getTitle() { return title; }
+        public String getGenre() { return genre; }
+        public double getRating() { return rating; }
+        public LocalDate getReleaseDate() { return releaseDate; }
+
+        @Override
+        public String toString() {
+            return String.format("ID: %s | Title: %-30s | Genre: %-12s | Rating: %.1f | Release: %s",
+                    id, title, genre, rating, releaseDate.toString());
+        }
+    }
+
+    private void loadMovies() {
+        File file = new File("movies.csv");
+        if (!file.exists()) {
+            System.err.println("Movie file not found: movies.csv");
+            return;
+        }
+
+        try (BufferedReader br = new BufferedReader(new FileReader(file))) {
+            String line;
+            boolean isFirstLine = true;
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+
+            while ((line = br.readLine()) != null) {
+                line = line.trim();
+                if (isFirstLine) {
+                    isFirstLine = false;
+                    continue; // Skip the header line
+                }
+                if (line.isEmpty()) continue;
+
+                String[] parts = line.split(",", 5);
+                if (parts.length != 5) {
+                    System.err.println("Invalid movie data: " + line);
+                    continue;
+                }
+
+                try {
+                    String id = parts[0].trim();
+                    String title = parts[1].trim();
+                    String genre = parts[2].trim();
+                    double rating = Double.parseDouble(parts[3].trim());
+                    LocalDate releaseDate = LocalDate.parse(parts[4].trim(), formatter);
+
+                    movies.add(new Movie(id, title, genre, rating, releaseDate));
+                } catch (NumberFormatException | DateTimeParseException e) {
+                    System.err.println("Error parsing movie data: " + line);
+                }
+            }
+            System.out.println("Loaded " + movies.size() + " movies successfully!");
+        } catch (IOException e) {
+            System.err.println("Error reading movie file: " + e.getMessage());
+        }
+    }
+
+    private void buildGenreMap() {
+        for (Movie movie : movies) {
+            String genre = movie.getGenre().toLowerCase();
+            genreMap.computeIfAbsent(genre, k -> new ArrayList<>()).add(movie);
+        }
+    }
+
+    public List<Movie> getMoviesByGenre(String genre) {
+        return genreMap.getOrDefault(genre.toLowerCase(), new ArrayList<>());
+    }
+
+    public List<Movie> getMovies() {
+        return movies;
+    }
+
+    public List<Movie> recommendMoviesByGenre(String genre, int topN) {
+        List<Movie> filteredMovies = getMoviesByGenre(genre).stream()
+                .sorted(Comparator.comparingDouble(Movie::getRating).reversed())
+                .collect(Collectors.toList());
+
+        return filteredMovies.stream().limit(topN).collect(Collectors.toList());
+    }
+
+    public List<Movie> recommendMoviesByRating(int topN) {
+        return getMovies().stream()
+                .sorted(Comparator.comparingDouble(Movie::getRating).reversed())
+                .limit(topN)
+                .collect(Collectors.toList());
+    }
+
+    public List<Movie> recommendMoviesByYear(int year, int topN) {
+        return getMovies().stream()
+                .filter(movie -> movie.getReleaseDate().getYear() == year)
+                .sorted(Comparator.comparingDouble(Movie::getRating).reversed())
+                .limit(topN)
+                .collect(Collectors.toList());
+    }
+
+    private void displayMainMenu() {
+        System.out.println("\n=== MAIN MENU ===");
+        System.out.println("1. View All Movies");
+        System.out.println("2. Browse by Genre");
+        System.out.println("3. Recommend Movies by Genre");
+        System.out.println("4. Recommend Top Rated Movies");
+        System.out.println("5. Recommend Movies by Year");
+        System.out.println("0. Exit");
+        System.out.print("Enter your choice: ");
+    }
+
+    private void displayAllMovies() {
+        System.out.println("\n=== All Movies ===");
+        movies.forEach(System.out::println);
+    }
+
+    private void browseByGenre() {
+        System.out.print("\nEnter genre to browse: ");
+        String genre = scanner.nextLine().trim().toLowerCase();
+        List<Movie> genreMovies = getMoviesByGenre(genre);
+
+        if (genreMovies.isEmpty()) {
+            System.out.println("No movies found for genre: " + genre);
+        } else {
+            System.out.println("\n=== Movies in Genre: " + genre + " ===");
+            genreMovies.forEach(System.out::println);
+        }
+    }
+
+    private void recommendMoviesByGenre() {
+        System.out.print("Enter genre to get recommendations: ");
+        String genre = scanner.nextLine().trim();
+        System.out.print("Enter number of top recommendations: ");
+        int topN = Integer.parseInt(scanner.nextLine().trim());
+
+        List<Movie> recommendations = recommendMoviesByGenre(genre, topN);
+        recommendations.forEach(System.out::println);
+    }
+
+    private void recommendTopRatedMovies() {
+        System.out.print("Enter number of top rated movies to recommend: ");
+        int topN = Integer.parseInt(scanner.nextLine().trim());
+
+        List<Movie> recommendations = recommendMoviesByRating(topN);
+        recommendations.forEach(System.out::println);
+    }
+
+    private void recommendMoviesByYear() {
+        System.out.print("Enter year to get recommendations: ");
+        int year = Integer.parseInt(scanner.nextLine().trim());
+        System.out.print("Enter number of top recommendations: ");
+        int topN = Integer.parseInt(scanner.nextLine().trim());
+
+        List<Movie> recommendations = recommendMoviesByYear(year, topN);
+        recommendations.forEach(System.out::println);
+    }
+
+    public void startMainSystem() {
+        System.out.println("Welcome to Movie System!");
+
+        while (true) {
+            displayMainMenu();
+            String choice = scanner.nextLine().trim();
+
+            switch (choice) {
+                case "1":
+                    displayAllMovies();
+                    break;
+                case "2":
+                    browseByGenre();
+                    break;
+                case "3":
+                    recommendMoviesByGenre();
+                    break;
+                case "4":
+                    recommendTopRatedMovies();
+                    break;
+                case "5":
+                    recommendMoviesByYear();
+                    break;
+                case "0":
+                    System.out.println("Goodbye!");
+                    scanner.close();
+                    return;
+                default:
+                    System.out.println("Invalid choice. Please try again.");
+            }
+        }
+    }
+
+    public static void main(String[] args) {
+        MovieSystem system = new MovieSystem();
+        system.startMainSystem();
     }
 }
