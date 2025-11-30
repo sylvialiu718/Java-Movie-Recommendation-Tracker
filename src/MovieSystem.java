@@ -760,11 +760,6 @@ public class MovieSystem {
                 default:
                     System.out.println("Invalid choice! Please try again.");
             }
-
-            if (running) {
-                System.out.println("\nPress Enter to continue...");
-                readInput();
-            }
         }
     }
 
@@ -773,76 +768,77 @@ public class MovieSystem {
         Watchlist watchlist = currentUser.getWatchlist();
         History history = currentUser.getHistory();
 
-        System.out.println("\n=== Manage Watchlist ===");
-        System.out.println("1. View watchlist");
-        System.out.println("2. Add movie to watchlist");
-        System.out.println("3. Remove movie from watchlist");
-        System.out.println("4. Mark movie as watched");
-        System.out.print("Choose option: ");
+        while (true) {
+            System.out.println("\n=== Manage Watchlist ===");
+            System.out.println("1. View watchlist");
+            System.out.println("2. Add movie to watchlist");
+            System.out.println("3. Remove movie from watchlist");
+            System.out.println("4. Mark movie as watched");
+            System.out.println("0. Back to main menu");
+            System.out.print("Choose option: ");
 
-        String choice = readInput().trim();
-        switch (choice) {
-            case "1":
-                List<String> watchlistIds = watchlist.getMovieIds();
-                if (watchlistIds.isEmpty()) {
-                    System.out.println("Your watchlist is empty.");
-                } else {
-                    System.out.println("Your watchlist:");
-                    for (String movieId : watchlistIds) {
-                        Movie movie = getMovieById(movieId);
-                        if (movie != null) {
-                            System.out.println(" - " + movie.getTitle() + " (ID: " + movieId + ")");
+            String choice = readInput().trim();
+            switch (choice) {
+                case "0":
+                    return;
+                case "1":
+                    List<String> watchlistIds = watchlist.getMovieIds();
+                    if (watchlistIds.isEmpty()) {
+                        System.out.println("Your watchlist is empty.");
+                    } else {
+                        System.out.println("Your watchlist:");
+                        for (String movieId : watchlistIds) {
+                            Movie movie = getMovieById(movieId);
+                            if (movie != null) {
+                                System.out.println(" - " + movie.getTitle() + " (ID: " + movieId + ")");
+                            }
                         }
                     }
-                }
-                break;
-            case "2":
-                System.out.print("Enter movie ID to add: ");
-                String movieIdToAdd = readInput().trim();
-                if (isValidMovieId(movieIdToAdd)) {
-                    if (watchlist.addMovie(movieIdToAdd)) {
-                        System.out.println("Movie added to watchlist.");
+                    break;
+                case "2":
+                    System.out.print("Enter movie ID to add: ");
+                    String movieIdToAdd = readInput().trim();
+                    if (isValidMovieId(movieIdToAdd)) {
+                        if (watchlist.addMovie(movieIdToAdd)) {
+                            System.out.println("Movie added to watchlist.");
+                            userAuth.saveUserChanges();
+                        }
+                    } else {
+                        System.out.println("Invalid movie ID.");
                     }
-                } else {
-                    System.out.println("Invalid movie ID.");
-                }
-                break;
-            case "3":
-                System.out.print("Enter movie ID to remove: ");
-                String movieIdToRemove = readInput().trim();
-                if (watchlist.removeMovie(movieIdToRemove)) {
-                    System.out.println("Movie removed from watchlist.");
-                } else {
-                    System.out.println("Movie not found in watchlist.");
-                }
-            case "4":
-                System.out.print("Enter movie ID to mark as watched: ");
-                String movieIdToWatch = readInput().trim();
-
-                if (!isValidMovieId(movieIdToWatch)) {
-                    System.out.println("Invalid movie ID:");
                     break;
-                }
-
-
-                if (!watchlist.getMovieIds().contains(movieIdToWatch)) {
-                    System.out.println("Movie is not in your watchlist.");
+                case "3":
+                    System.out.print("Enter movie ID to remove: ");
+                    String movieIdToRemove = readInput().trim();
+                    if (watchlist.removeMovie(movieIdToRemove)) {
+                        System.out.println("Movie removed from watchlist.");
+                        userAuth.saveUserChanges();
+                    } else {
+                        System.out.println("Movie not found in watchlist.");
+                    }
                     break;
-                }
-
-
-                watchlist.removeMovie(movieIdToWatch);
-                history.addWatchedMovie(movieIdToWatch);
-
-
-                if (userAuth.saveUserChanges()) {
-                    System.out.println("Movie marked as watched. Moved to viewing history.");
-                } else {
-                    System.out.println("Failed to save changes.");
-                }
-                break;
-            default:
-                System.out.println("Invalid option.");
+                case "4":
+                    System.out.print("Enter movie ID to mark as watched: ");
+                    String movieIdToWatch = readInput().trim();
+                    if (!isValidMovieId(movieIdToWatch)) {
+                        System.out.println("Invalid movie ID.");
+                        break;
+                    }
+                    if (!watchlist.getMovieIds().contains(movieIdToWatch)) {
+                        System.out.println("Movie is not in your watchlist.");
+                        break;
+                    }
+                    watchlist.removeMovie(movieIdToWatch);
+                    history.addWatchedMovie(movieIdToWatch);
+                    if (userAuth.saveUserChanges()) {
+                        System.out.println("Movie marked as watched. Moved to viewing history.");
+                    } else {
+                        System.out.println("Failed to save changes.");
+                    }
+                    break;
+                default:
+                    System.out.println("Invalid option.");
+            }
         }
     }
 
@@ -850,40 +846,46 @@ public class MovieSystem {
         User currentUser = userAuth.getCurrentUser();
         History history = currentUser.getHistory();
 
-        System.out.println("\n=== Manage Viewing History ===");
-        System.out.println("1. View history");
-        System.out.println("2. Add movie to history");
-        System.out.print("Choose option: ");
+        while (true) {
+            System.out.println("\n=== Manage Viewing History ===");
+            System.out.println("1. View history");
+            System.out.println("2. Add movie to history");
+            System.out.println("0. Back to main menu");
+            System.out.print("Choose option: ");
 
-        String choice = readInput().trim();
-        switch (choice) {
-            case "1":
-                List<String> historyIds = history.getWatchedMovieIds();
-                if (historyIds.isEmpty()) {
-                    System.out.println("Your viewing history is empty.");
-                } else {
-                    System.out.println("Your viewing history:");
-                    for (String movieId : historyIds) {
-                        Movie movie = getMovieById(movieId);
-                        if (movie != null) {
-                            System.out.println(" - " + movie.getTitle() + " (ID: " + movieId + ")");
+            String choice = readInput().trim();
+            switch (choice) {
+                case "0":
+                    return;
+                case "1":
+                    List<String> historyIds = history.getWatchedMovieIds();
+                    if (historyIds.isEmpty()) {
+                        System.out.println("Your viewing history is empty.");
+                    } else {
+                        System.out.println("Your viewing history:");
+                        for (String movieId : historyIds) {
+                            Movie movie = getMovieById(movieId);
+                            if (movie != null) {
+                                System.out.println(" - " + movie.getTitle() + " (ID: " + movieId + ")");
+                            }
                         }
                     }
-                }
-                break;
-            case "2":
-                System.out.print("Enter movie ID to add to history: ");
-                String movieIdToAdd = readInput().trim();
-                if (isValidMovieId(movieIdToAdd)) {
-                    if (history.addWatchedMovie(movieIdToAdd)) {
-                        System.out.println("Movie added to viewing history.");
+                    break;
+                case "2":
+                    System.out.print("Enter movie ID to add to history: ");
+                    String movieIdToAdd = readInput().trim();
+                    if (isValidMovieId(movieIdToAdd)) {
+                        if (history.addWatchedMovie(movieIdToAdd)) {
+                            System.out.println("Movie added to viewing history.");
+                            userAuth.saveUserChanges();
+                        }
+                    } else {
+                        System.out.println("Invalid movie ID.");
                     }
-                } else {
-                    System.out.println("Invalid movie ID.");
-                }
-                break;
-            default:
-                System.out.println("Invalid option.");
+                    break;
+                default:
+                    System.out.println("Invalid option.");
+            }
         }
     }
 
