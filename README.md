@@ -14,8 +14,7 @@ cw/
 ├── data/                       # 数据文件
 │   ├── movies.csv              # 电影数据
 │   └── users.csv               # 用户数据
-├── javafx-sdk-25.0.1/          # JavaFX SDK (可选)
-└── README.md                   # 说明文档
+└── javafx-sdk-25.0.1/          # JavaFX SDK (可选)
 ```
 
 ## 编译和运行
