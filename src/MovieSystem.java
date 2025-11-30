@@ -1,9 +1,5 @@
 import java.io.*;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.util.*;
-import java.util.stream.Collectors;
 
 class Watchlist {
     private List<String> movieIds;
@@ -47,7 +43,7 @@ class Watchlist {
     }
 
     public String toCsvString() {
-        return String.join(",", movieIds);
+        return String.join(";", movieIds);
     }
 }
 
@@ -80,7 +76,7 @@ class History {
     }
 
     public String toCsvString() {
-        return String.join(",", movieIds);
+        return String.join(";", movieIds);
     }
 }
 
@@ -288,9 +284,13 @@ class UserFileHandler {
     private List<String> parseIdList(String str) {
         List<String> ids = new ArrayList<>();
         if (!str.isEmpty()) {
-            String[] idArr = str.split(",");
+            String[] idArr = str.split(";");
             for (String id : idArr) {
                 id = id.trim();
+                // Handle history format with date: M001@2025-07-12
+                if (id.contains("@")) {
+                    id = id.split("@")[0].trim();
+                }
                 if (!id.isEmpty()) {
                     ids.add(id);
                 }
@@ -319,6 +319,11 @@ class PasswordEncoder {
     }
 
     public static boolean verifyPassword(String rawPassword, String storedPassword) {
+        // First check if password matches as plain text (for pre-existing users)
+        if (rawPassword.equals(storedPassword)) {
+            return true;
+        }
+        // Then check encoded password (for newly registered users)
         String encodedInput = encodePassword(rawPassword);
         return encodedInput.equals(storedPassword);
     }
@@ -344,15 +349,13 @@ public class MovieSystem {
     static class Movie {
         protected String id;
         protected String title;
-        protected String country;
         protected String genre;
         protected int year;
         protected double rating;
 
-        public Movie(String id, String title, String country, String genre, int year, double rating) {
+        public Movie(String id, String title, String genre, int year, double rating) {
             this.id = id;
             this.title = title;
-            this.country = country;
             this.genre = genre;
             this.year = year;
             this.rating = rating;
@@ -360,21 +363,19 @@ public class MovieSystem {
 
         public String getId() { return id; }
         public String getTitle() { return title; }
-        public String getCountry() { return country; }
         public String getGenre() { return genre; }
         public int getYear() { return year; }
         public double getRating() { return rating; }
 
         @Override
         public String toString() {
-            return String.format("ID: %s | Title: %-40s | Country: %-15s | Genre: %-10s | Year: %d | Rating: %.1f",
-                    id, title.length() > 40 ? title.substring(0, 37) + "..." : title,
-                    country.length() > 15 ? country.substring(0, 12) + "..." : country,
+            return String.format("ID: %s | Title: %-45s | Genre: %-10s | Year: %d | Rating: %.1f",
+                    id, title.length() > 45 ? title.substring(0, 42) + "..." : title,
                     genre, year, rating);
         }
 
         public String toCsvString() {
-            return String.format("%s,%s,%s,%s,%d,%.1f", id, title, country, genre, year, rating);
+            return String.format("%s,%s,%s,%d,%.1f", id, title, genre, year, rating);
         }
 
         @Override
@@ -396,10 +397,8 @@ public class MovieSystem {
         try (BufferedReader br = new BufferedReader(new FileReader(movieFilePath))) {
             String line;
             boolean isFirstLine = true;
-            int lineCount = 0;
 
             while ((line = br.readLine()) != null) {
-                lineCount++;
                 if (isFirstLine) {
                     isFirstLine = false;
                     continue;
@@ -411,10 +410,10 @@ public class MovieSystem {
                         movies.add(movie);
                     }
                 } catch (Exception e) {
-                    System.out.println("Error parsing movie line " + lineCount + ": " + line + " - " + e.getMessage());
+                    System.out.println("Error parsing movie: " + e.getMessage());
                 }
             }
-            System.out.println("Successfully loaded " + movies.size() + " movies from " + movieFilePath);
+            System.out.println("Successfully loaded " + movies.size() + " movies.");
 
         } catch (FileNotFoundException e) {
             System.out.println("Movie file not found: " + movieFilePath);
@@ -426,26 +425,19 @@ public class MovieSystem {
     private Movie parseMovieFromCsv(String csvLine) {
         String[] parts = csvLine.split(",", -1);
 
-        if (parts.length < 6) {
-            System.out.println("Invalid movie data (insufficient columns): " + csvLine);
+        if (parts.length < 5) {
             return null;
         }
 
         try {
             String id = parts[0].trim();
             String title = parts[1].trim();
-            String country = parts[2].trim();
-            String genre = parts[3].trim();
-            int year = Integer.parseInt(parts[4].trim());
-            double rating = Double.parseDouble(parts[5].trim());
+            String genre = parts[2].trim();
+            int year = Integer.parseInt(parts[3].trim());
+            double rating = Double.parseDouble(parts[4].trim());
 
-            return new Movie(id, title, country, genre, year, rating);
-
+            return new Movie(id, title, genre, year, rating);
         } catch (NumberFormatException e) {
-            System.out.println("Error parsing numbers in movie data: " + csvLine);
-            return null;
-        } catch (Exception e) {
-            System.out.println("Unexpected error parsing movie data: " + csvLine);
             return null;
         }
     }
@@ -1303,224 +1295,5 @@ public class MovieSystem {
         } catch (IOException e) {
             System.out.println("Error reading input: " + e.getMessage());
         }
-    }
-
-}
-class RecommendEngine {
-    private List<Movie> movies;
-    private Map<String, List<Movie>> genreMap;
-    private Scanner scanner;
-
-    public RecommendEngine() {
-        this.movies = new ArrayList<>();
-        this.genreMap = new HashMap<>();
-        this.scanner = new Scanner(System.in);
-        loadMovies();
-        buildGenreMap();
-    }
-
-    static class Movie {
-        private String id;
-        private String title;
-        private String genre;
-        private double rating;
-        private LocalDate releaseDate;
-
-        public Movie(String id, String title, String genre, double rating, LocalDate releaseDate) {
-            this.id = id;
-            this.title = title;
-            this.genre = genre;
-            this.rating = rating;
-            this.releaseDate = releaseDate;
-        }
-
-        public String getId() { return id; }
-        public String getTitle() { return title; }
-        public String getGenre() { return genre; }
-        public double getRating() { return rating; }
-        public LocalDate getReleaseDate() { return releaseDate; }
-
-        @Override
-        public String toString() {
-            return String.format("ID: %s | Title: %-30s | Genre: %-12s | Rating: %.1f | Release: %s",
-                    id, title, genre, rating, releaseDate.toString());
-        }
-    }
-
-    private void loadMovies() {
-        File file = new File("data/movies.csv");
-        if (!file.exists()) {
-            System.err.println("Movie file not found: data/movies.csv");
-            return;
-        }
-
-        try (BufferedReader br = new BufferedReader(new FileReader(file))) {
-            String line;
-            boolean isFirstLine = true;
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-
-            while ((line = br.readLine()) != null) {
-                line = line.trim();
-                if (isFirstLine) {
-                    isFirstLine = false;
-                    continue; // Skip the header line
-                }
-                if (line.isEmpty()) continue;
-
-                String[] parts = line.split(",", 5);
-                if (parts.length != 5) {
-                    System.err.println("Invalid movie data: " + line);
-                    continue;
-                }
-
-                try {
-                    String id = parts[0].trim();
-                    String title = parts[1].trim();
-                    String genre = parts[2].trim();
-                    double rating = Double.parseDouble(parts[3].trim());
-                    LocalDate releaseDate = LocalDate.parse(parts[4].trim(), formatter);
-
-                    movies.add(new Movie(id, title, genre, rating, releaseDate));
-                } catch (NumberFormatException | DateTimeParseException e) {
-                    System.err.println("Error parsing movie data: " + line);
-                }
-            }
-            System.out.println("Loaded " + movies.size() + " movies successfully!");
-        } catch (IOException e) {
-            System.err.println("Error reading movie file: " + e.getMessage());
-        }
-    }
-
-    private void buildGenreMap() {
-        for (Movie movie : movies) {
-            String genre = movie.getGenre().toLowerCase();
-            genreMap.computeIfAbsent(genre, k -> new ArrayList<>()).add(movie);
-        }
-    }
-
-    public List<Movie> getMoviesByGenre(String genre) {
-        return genreMap.getOrDefault(genre.toLowerCase(), new ArrayList<>());
-    }
-
-    public List<Movie> getMovies() {
-        return movies;
-    }
-
-    public List<Movie> recommendMoviesByGenre(String genre, int topN) {
-        List<Movie> filteredMovies = getMoviesByGenre(genre).stream()
-                .sorted(Comparator.comparingDouble(Movie::getRating).reversed())
-                .collect(Collectors.toList());
-
-        return filteredMovies.stream().limit(topN).collect(Collectors.toList());
-    }
-
-    public List<Movie> recommendMoviesByRating(int topN) {
-        return getMovies().stream()
-                .sorted(Comparator.comparingDouble(Movie::getRating).reversed())
-                .limit(topN)
-                .collect(Collectors.toList());
-    }
-
-    public List<Movie> recommendMoviesByYear(int year, int topN) {
-        return getMovies().stream()
-                .filter(movie -> movie.getReleaseDate().getYear() == year)
-                .sorted(Comparator.comparingDouble(Movie::getRating).reversed())
-                .limit(topN)
-                .collect(Collectors.toList());
-    }
-
-    private void displayMainMenu() {
-        System.out.println("\n=== MAIN MENU ===");
-        System.out.println("1. View All Movies");
-        System.out.println("2. Browse by Genre");
-        System.out.println("3. Recommend Movies by Genre");
-        System.out.println("4. Recommend Top Rated Movies");
-        System.out.println("5. Recommend Movies by Year");
-        System.out.println("0. Exit");
-        System.out.print("Enter your choice: ");
-    }
-
-    private void displayAllMovies() {
-        System.out.println("\n=== All Movies ===");
-        movies.forEach(System.out::println);
-    }
-
-    private void browseByGenre() {
-        System.out.print("\nEnter genre to browse: ");
-        String genre = scanner.nextLine().trim().toLowerCase();
-        List<Movie> genreMovies = getMoviesByGenre(genre);
-
-        if (genreMovies.isEmpty()) {
-            System.out.println("No movies found for genre: " + genre);
-        } else {
-            System.out.println("\n=== Movies in Genre: " + genre + " ===");
-            genreMovies.forEach(System.out::println);
-        }
-    }
-
-    private void recommendMoviesByGenre() {
-        System.out.print("Enter genre to get recommendations: ");
-        String genre = scanner.nextLine().trim();
-        System.out.print("Enter number of top recommendations: ");
-        int topN = Integer.parseInt(scanner.nextLine().trim());
-
-        List<Movie> recommendations = recommendMoviesByGenre(genre, topN);
-        recommendations.forEach(System.out::println);
-    }
-
-    private void recommendTopRatedMovies() {
-        System.out.print("Enter number of top rated movies to recommend: ");
-        int topN = Integer.parseInt(scanner.nextLine().trim());
-
-        List<Movie> recommendations = recommendMoviesByRating(topN);
-        recommendations.forEach(System.out::println);
-    }
-
-    private void recommendMoviesByYear() {
-        System.out.print("Enter year to get recommendations: ");
-        int year = Integer.parseInt(scanner.nextLine().trim());
-        System.out.print("Enter number of top recommendations: ");
-        int topN = Integer.parseInt(scanner.nextLine().trim());
-
-        List<Movie> recommendations = recommendMoviesByYear(year, topN);
-        recommendations.forEach(System.out::println);
-    }
-
-    public void startMainSystem() {
-        System.out.println("Welcome to Movie System!");
-
-        while (true) {
-            displayMainMenu();
-            String choice = scanner.nextLine().trim();
-
-            switch (choice) {
-                case "1":
-                    displayAllMovies();
-                    break;
-                case "2":
-                    browseByGenre();
-                    break;
-                case "3":
-                    recommendMoviesByGenre();
-                    break;
-                case "4":
-                    recommendTopRatedMovies();
-                    break;
-                case "5":
-                    recommendMoviesByYear();
-                    break;
-                case "0":
-                    System.out.println("Goodbye!");
-                    scanner.close();
-                    return;
-                default:
-                    System.out.println("Invalid choice. Please try again.");
-            }
-        }
-    }
-
-    public static void main(String[] args) {
-        MovieSystem system = new MovieSystem();
-        system.startMainSystem();
     }
 }

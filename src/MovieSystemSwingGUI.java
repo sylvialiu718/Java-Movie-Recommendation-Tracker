@@ -30,13 +30,16 @@ public class MovieSystemSwingGUI extends JFrame {
     private static final String USERS_FILE = "data/users.csv";
     
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> {
-            try {
-                UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-            } catch (Exception e) {
-                e.printStackTrace();
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+                new MovieSystemSwingGUI();
             }
-            new MovieSystemSwingGUI();
         });
     }
     
@@ -71,19 +74,21 @@ public class MovieSystemSwingGUI extends JFrame {
                 }
                 
                 String[] parts = line.split(",", -1);
-                if (parts.length >= 6) {
+                if (parts.length >= 5) {
                     try {
                         String id = parts[0].trim();
                         String title = parts[1].trim();
-                        String country = parts[2].trim();
-                        String genre = parts[3].trim();
-                        int year = Integer.parseInt(parts[4].trim());
-                        double rating = Double.parseDouble(parts[5].trim());
+                        String genre = parts[2].trim();
+                        int year = Integer.parseInt(parts[3].trim());
+                        double rating = Double.parseDouble(parts[4].trim());
                         
-                        MovieData movie = new MovieData(id, title, country, genre, year, rating);
+                        MovieData movie = new MovieData(id, title, genre, year, rating);
                         movies.add(movie);
                         
-                        genreMap.computeIfAbsent(genre, k -> new ArrayList<>()).add(movie);
+                        if (!genreMap.containsKey(genre)) {
+                            genreMap.put(genre, new ArrayList<MovieData>());
+                        }
+                        genreMap.get(genre).add(movie);
                     } catch (NumberFormatException e) {
                         // Skip invalid lines
                     }
@@ -114,12 +119,34 @@ public class MovieSystemSwingGUI extends JFrame {
                 if (parts.length >= 2) {
                     String username = parts[0].trim();
                     String password = parts[1].trim();
-                    List<String> watchlist = parts.length > 2 && !parts[2].trim().isEmpty() 
-                        ? new ArrayList<>(Arrays.asList(parts[2].trim().split(","))) 
-                        : new ArrayList<>();
-                    List<String> history = parts.length > 3 && !parts[3].trim().isEmpty() 
-                        ? new ArrayList<>(Arrays.asList(parts[3].trim().split(","))) 
-                        : new ArrayList<>();
+                    
+                    // Parse watchlist (semicolon separated)
+                    List<String> watchlist = new ArrayList<String>();
+                    if (parts.length > 2 && !parts[2].trim().isEmpty()) {
+                        String[] watchlistArr = parts[2].trim().split(";");
+                        for (String id : watchlistArr) {
+                            id = id.trim();
+                            if (!id.isEmpty()) {
+                                watchlist.add(id);
+                            }
+                        }
+                    }
+                    
+                    // Parse history (semicolon separated, may have @date suffix)
+                    List<String> history = new ArrayList<String>();
+                    if (parts.length > 3 && !parts[3].trim().isEmpty()) {
+                        String[] historyArr = parts[3].trim().split(";");
+                        for (String item : historyArr) {
+                            item = item.trim();
+                            // Extract movie ID from format like "M001@2025-07-12"
+                            if (item.contains("@")) {
+                                item = item.split("@")[0].trim();
+                            }
+                            if (!item.isEmpty()) {
+                                history.add(item);
+                            }
+                        }
+                    }
                     
                     userData.put(username, new UserData(username, password, watchlist, history));
                 }
@@ -162,11 +189,11 @@ public class MovieSystemSwingGUI extends JFrame {
         subtitleLabel.setForeground(Color.LIGHT_GRAY);
         subtitleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
         
-        JTextField usernameField = new JTextField(20);
+        final JTextField usernameField = new JTextField(20);
         usernameField.setMaximumSize(new Dimension(300, 35));
         usernameField.setFont(new Font("Arial", Font.PLAIN, 14));
         
-        JPasswordField passwordField = new JPasswordField(20);
+        final JPasswordField passwordField = new JPasswordField(20);
         passwordField.setMaximumSize(new Dimension(300, 35));
         passwordField.setFont(new Font("Arial", Font.PLAIN, 14));
         
@@ -181,7 +208,11 @@ public class MovieSystemSwingGUI extends JFrame {
         loginBtn.setOpaque(true);
         loginBtn.setFont(new Font("Arial", Font.BOLD, 14));
         loginBtn.setPreferredSize(new Dimension(120, 35));
-        loginBtn.addActionListener(e -> handleLogin(usernameField.getText(), new String(passwordField.getPassword())));
+        loginBtn.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                handleLogin(usernameField.getText(), new String(passwordField.getPassword()));
+            }
+        });
         
         JButton registerBtn = new JButton("Register");
         registerBtn.setBackground(new Color(41, 128, 185));
@@ -191,7 +222,11 @@ public class MovieSystemSwingGUI extends JFrame {
         registerBtn.setOpaque(true);
         registerBtn.setFont(new Font("Arial", Font.BOLD, 14));
         registerBtn.setPreferredSize(new Dimension(120, 35));
-        registerBtn.addActionListener(e -> handleRegister(usernameField.getText(), new String(passwordField.getPassword())));
+        registerBtn.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                handleRegister(usernameField.getText(), new String(passwordField.getPassword()));
+            }
+        });
         
         buttonPanel.add(loginBtn);
         buttonPanel.add(registerBtn);
@@ -225,8 +260,11 @@ public class MovieSystemSwingGUI extends JFrame {
             return;
         }
         
+        // Check plain text first (for pre-existing users), then encoded
+        String storedPwd = user.getPassword();
         String encoded = encodePassword(password);
-        if (!encoded.equals(user.getPassword())) {
+        
+        if (!password.equals(storedPwd) && !encoded.equals(storedPwd)) {
             JOptionPane.showMessageDialog(this, "Incorrect password", "Error", JOptionPane.ERROR_MESSAGE);
             return;
         }
@@ -291,12 +329,14 @@ public class MovieSystemSwingGUI extends JFrame {
         logoutBtn.setBorderPainted(false);
         logoutBtn.setOpaque(true);
         logoutBtn.setFont(new Font("Arial", Font.BOLD, 12));
-        logoutBtn.addActionListener(e -> {
-            saveUsers();
-            currentUser = null;
-            setContentPane(loginPanel);
-            revalidate();
-            repaint();
+        logoutBtn.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                saveUsers();
+                currentUser = null;
+                setContentPane(loginPanel);
+                revalidate();
+                repaint();
+            }
         });
         
         rightHeader.add(userLabel);
@@ -314,7 +354,11 @@ public class MovieSystemSwingGUI extends JFrame {
         JPanel filterBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
         
         searchField = new JTextField(20);
-        searchField.addActionListener(e -> searchMovies());
+        searchField.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                searchMovies();
+            }
+        });
         
         JButton searchBtn = new JButton("Search");
         searchBtn.setBackground(new Color(41, 128, 185));
@@ -323,14 +367,22 @@ public class MovieSystemSwingGUI extends JFrame {
         searchBtn.setBorderPainted(false);
         searchBtn.setOpaque(true);
         searchBtn.setFont(new Font("Arial", Font.BOLD, 12));
-        searchBtn.addActionListener(e -> searchMovies());
+        searchBtn.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                searchMovies();
+            }
+        });
         
         genreComboBox = new JComboBox<>();
         genreComboBox.addItem("All Genres");
         for (String genre : genreMap.keySet()) {
             genreComboBox.addItem(genre);
         }
-        genreComboBox.addActionListener(e -> filterByGenre());
+        genreComboBox.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                filterByGenre();
+            }
+        });
         
         JButton topRatedBtn = new JButton("Top Rated");
         topRatedBtn.setBackground(new Color(243, 156, 18));
@@ -339,7 +391,11 @@ public class MovieSystemSwingGUI extends JFrame {
         topRatedBtn.setBorderPainted(false);
         topRatedBtn.setOpaque(true);
         topRatedBtn.setFont(new Font("Arial", Font.BOLD, 12));
-        topRatedBtn.addActionListener(e -> showTopRated());
+        topRatedBtn.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                showTopRated();
+            }
+        });
         
         JButton recommendBtn = new JButton("Get Recommendations");
         recommendBtn.setBackground(new Color(39, 174, 96));
@@ -348,7 +404,11 @@ public class MovieSystemSwingGUI extends JFrame {
         recommendBtn.setBorderPainted(false);
         recommendBtn.setOpaque(true);
         recommendBtn.setFont(new Font("Arial", Font.BOLD, 12));
-        recommendBtn.addActionListener(e -> showRecommendations());
+        recommendBtn.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                showRecommendations();
+            }
+        });
         
         JButton refreshBtn = new JButton("Show All");
         refreshBtn.setBackground(new Color(149, 165, 166));
@@ -357,7 +417,11 @@ public class MovieSystemSwingGUI extends JFrame {
         refreshBtn.setBorderPainted(false);
         refreshBtn.setOpaque(true);
         refreshBtn.setFont(new Font("Arial", Font.BOLD, 12));
-        refreshBtn.addActionListener(e -> refreshMovieTable());
+        refreshBtn.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                refreshMovieTable();
+            }
+        });
         
         filterBar.add(searchField);
         filterBar.add(searchBtn);
@@ -367,27 +431,26 @@ public class MovieSystemSwingGUI extends JFrame {
         filterBar.add(refreshBtn);
         
         // Movie table
-        String[] columns = {"ID", "Title", "Country", "Genre", "Year", "Rating", "Actions"};
+        String[] columns = {"ID", "Title", "Genre", "Year", "Rating", "Actions"};
         tableModel = new DefaultTableModel(columns, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
-                return column == 6;
+                return column == 5;
             }
         };
         
         movieTable = new JTable(tableModel);
         movieTable.setRowHeight(30);
         movieTable.getColumnModel().getColumn(0).setPreferredWidth(50);
-        movieTable.getColumnModel().getColumn(1).setPreferredWidth(250);
-        movieTable.getColumnModel().getColumn(2).setPreferredWidth(120);
-        movieTable.getColumnModel().getColumn(3).setPreferredWidth(80);
-        movieTable.getColumnModel().getColumn(4).setPreferredWidth(50);
-        movieTable.getColumnModel().getColumn(5).setPreferredWidth(50);
-        movieTable.getColumnModel().getColumn(6).setPreferredWidth(160);
+        movieTable.getColumnModel().getColumn(1).setPreferredWidth(300);
+        movieTable.getColumnModel().getColumn(2).setPreferredWidth(100);
+        movieTable.getColumnModel().getColumn(3).setPreferredWidth(60);
+        movieTable.getColumnModel().getColumn(4).setPreferredWidth(60);
+        movieTable.getColumnModel().getColumn(5).setPreferredWidth(180);
         
         // Action buttons in table
-        movieTable.getColumnModel().getColumn(6).setCellRenderer(new ButtonRenderer());
-        movieTable.getColumnModel().getColumn(6).setCellEditor(new ButtonEditor(new JCheckBox()));
+        movieTable.getColumnModel().getColumn(5).setCellRenderer(new ButtonRenderer());
+        movieTable.getColumnModel().getColumn(5).setCellEditor(new ButtonEditor(new JCheckBox()));
         
         JScrollPane tableScroll = new JScrollPane(movieTable);
         
@@ -418,7 +481,11 @@ public class MovieSystemSwingGUI extends JFrame {
         removeWatchlistBtn.setBorderPainted(false);
         removeWatchlistBtn.setOpaque(true);
         removeWatchlistBtn.setFont(new Font("Arial", Font.BOLD, 11));
-        removeWatchlistBtn.addActionListener(e -> removeFromWatchlist());
+        removeWatchlistBtn.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                removeFromWatchlist();
+            }
+        });
         
         JButton moveToHistoryBtn = new JButton("Mark Watched");
         moveToHistoryBtn.setBackground(new Color(39, 174, 96));
@@ -427,7 +494,11 @@ public class MovieSystemSwingGUI extends JFrame {
         moveToHistoryBtn.setBorderPainted(false);
         moveToHistoryBtn.setOpaque(true);
         moveToHistoryBtn.setFont(new Font("Arial", Font.BOLD, 11));
-        moveToHistoryBtn.addActionListener(e -> moveToHistory());
+        moveToHistoryBtn.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                moveToHistory();
+            }
+        });
         
         watchlistBtns.add(removeWatchlistBtn);
         watchlistBtns.add(moveToHistoryBtn);
@@ -471,7 +542,7 @@ public class MovieSystemSwingGUI extends JFrame {
         tableModel.setRowCount(0);
         for (MovieData movie : movies) {
             tableModel.addRow(new Object[]{
-                movie.getId(), movie.getTitle(), movie.getCountry(),
+                movie.getId(), movie.getTitle(),
                 movie.getGenre(), movie.getYear(), movie.getRating(), "Actions"
             });
         }
@@ -490,7 +561,7 @@ public class MovieSystemSwingGUI extends JFrame {
         for (MovieData movie : movies) {
             if (movie.getTitle().toLowerCase().contains(term)) {
                 tableModel.addRow(new Object[]{
-                    movie.getId(), movie.getTitle(), movie.getCountry(),
+                    movie.getId(), movie.getTitle(),
                     movie.getGenre(), movie.getYear(), movie.getRating(), "Actions"
                 });
                 count++;
@@ -510,7 +581,7 @@ public class MovieSystemSwingGUI extends JFrame {
         List<MovieData> genreMovies = genreMap.getOrDefault(genre, new ArrayList<>());
         for (MovieData movie : genreMovies) {
             tableModel.addRow(new Object[]{
-                movie.getId(), movie.getTitle(), movie.getCountry(),
+                movie.getId(), movie.getTitle(),
                 movie.getGenre(), movie.getYear(), movie.getRating(), "Actions"
             });
         }
@@ -518,15 +589,24 @@ public class MovieSystemSwingGUI extends JFrame {
     }
     
     private void showTopRated() {
-        List<MovieData> sorted = new ArrayList<>(movies);
-        sorted.sort((a, b) -> Double.compare(b.getRating(), a.getRating()));
+        List<MovieData> sorted = new ArrayList<MovieData>(movies);
+        // Manual bubble sort by rating (descending)
+        for (int i = 0; i < sorted.size() - 1; i++) {
+            for (int j = 0; j < sorted.size() - i - 1; j++) {
+                if (sorted.get(j).getRating() < sorted.get(j + 1).getRating()) {
+                    MovieData temp = sorted.get(j);
+                    sorted.set(j, sorted.get(j + 1));
+                    sorted.set(j + 1, temp);
+                }
+            }
+        }
         
         tableModel.setRowCount(0);
         int count = Math.min(20, sorted.size());
         for (int i = 0; i < count; i++) {
             MovieData movie = sorted.get(i);
             tableModel.addRow(new Object[]{
-                movie.getId(), movie.getTitle(), movie.getCountry(),
+                movie.getId(), movie.getTitle(),
                 movie.getGenre(), movie.getYear(), movie.getRating(), "Actions"
             });
         }
@@ -577,7 +657,16 @@ public class MovieSystemSwingGUI extends JFrame {
             }
         }
         
-        recommendations.sort((a, b) -> Double.compare(b.getRating(), a.getRating()));
+        // Manual bubble sort by rating (descending)
+        for (int i = 0; i < recommendations.size() - 1; i++) {
+            for (int j = 0; j < recommendations.size() - i - 1; j++) {
+                if (recommendations.get(j).getRating() < recommendations.get(j + 1).getRating()) {
+                    MovieData temp = recommendations.get(j);
+                    recommendations.set(j, recommendations.get(j + 1));
+                    recommendations.set(j + 1, temp);
+                }
+            }
+        }
         
         if (recommendations.isEmpty()) {
             JOptionPane.showMessageDialog(this, 
@@ -589,7 +678,7 @@ public class MovieSystemSwingGUI extends JFrame {
         tableModel.setRowCount(0);
         for (MovieData movie : recommendations) {
             tableModel.addRow(new Object[]{
-                movie.getId(), movie.getTitle(), movie.getCountry(),
+                movie.getId(), movie.getTitle(),
                 movie.getGenre(), movie.getYear(), movie.getRating(), "Actions"
             });
         }
@@ -727,9 +816,11 @@ public class MovieSystemSwingGUI extends JFrame {
             watchlistBtn.setOpaque(true);
             watchlistBtn.setMargin(new Insets(2, 6, 2, 6));
             watchlistBtn.setFont(new Font("Arial", Font.BOLD, 10));
-            watchlistBtn.addActionListener(e -> {
-                addToWatchlist(movieId);
-                fireEditingStopped();
+            watchlistBtn.addActionListener(new ActionListener() {
+                public void actionPerformed(ActionEvent e) {
+                    addToWatchlist(movieId);
+                    fireEditingStopped();
+                }
             });
             
             watchedBtn = new JButton("Watched");
@@ -740,9 +831,11 @@ public class MovieSystemSwingGUI extends JFrame {
             watchedBtn.setOpaque(true);
             watchedBtn.setMargin(new Insets(2, 6, 2, 6));
             watchedBtn.setFont(new Font("Arial", Font.BOLD, 10));
-            watchedBtn.addActionListener(e -> {
-                addToHistory(movieId);
-                fireEditingStopped();
+            watchedBtn.addActionListener(new ActionListener() {
+                public void actionPerformed(ActionEvent e) {
+                    addToHistory(movieId);
+                    fireEditingStopped();
+                }
             });
             
             panel.add(watchlistBtn);
@@ -766,15 +859,13 @@ public class MovieSystemSwingGUI extends JFrame {
     public static class MovieData {
         private String id;
         private String title;
-        private String country;
         private String genre;
         private int year;
         private double rating;
         
-        public MovieData(String id, String title, String country, String genre, int year, double rating) {
+        public MovieData(String id, String title, String genre, int year, double rating) {
             this.id = id;
             this.title = title;
-            this.country = country;
             this.genre = genre;
             this.year = year;
             this.rating = rating;
@@ -782,7 +873,6 @@ public class MovieSystemSwingGUI extends JFrame {
         
         public String getId() { return id; }
         public String getTitle() { return title; }
-        public String getCountry() { return country; }
         public String getGenre() { return genre; }
         public int getYear() { return year; }
         public double getRating() { return rating; }
@@ -808,8 +898,8 @@ public class MovieSystemSwingGUI extends JFrame {
         
         public String toCsvLine() {
             return username + "," + password + "," + 
-                   String.join(",", watchlist) + "," + 
-                   String.join(",", history);
+                   String.join(";", watchlist) + "," + 
+                   String.join(";", history);
         }
     }
 }
