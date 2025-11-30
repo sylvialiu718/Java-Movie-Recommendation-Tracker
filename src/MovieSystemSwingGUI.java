@@ -90,7 +90,6 @@ public class MovieSystemSwingGUI extends JFrame {
                         }
                         genreMap.get(genre).add(movie);
                     } catch (NumberFormatException e) {
-                        // Skip invalid lines
                     }
                 }
             }
@@ -120,7 +119,6 @@ public class MovieSystemSwingGUI extends JFrame {
                     String username = parts[0].trim();
                     String password = parts[1].trim();
                     
-                    // Parse watchlist (semicolon separated)
                     List<String> watchlist = new ArrayList<String>();
                     if (parts.length > 2 && !parts[2].trim().isEmpty()) {
                         String[] watchlistArr = parts[2].trim().split(";");
@@ -132,13 +130,11 @@ public class MovieSystemSwingGUI extends JFrame {
                         }
                     }
                     
-                    // Parse history (semicolon separated, may have @date suffix)
                     List<String> history = new ArrayList<String>();
                     if (parts.length > 3 && !parts[3].trim().isEmpty()) {
                         String[] historyArr = parts[3].trim().split(";");
                         for (String item : historyArr) {
                             item = item.trim();
-                            // Extract movie ID from format like "M001@2025-07-12"
                             if (item.contains("@")) {
                                 item = item.split("@")[0].trim();
                             }
@@ -260,7 +256,6 @@ public class MovieSystemSwingGUI extends JFrame {
             return;
         }
         
-        // Check plain text first (for pre-existing users), then encoded
         String storedPwd = user.getPassword();
         String encoded = encodePassword(password);
         
@@ -306,7 +301,6 @@ public class MovieSystemSwingGUI extends JFrame {
     private void createMainPanel() {
         mainPanel = new JPanel(new BorderLayout());
         
-        // Header
         JPanel header = new JPanel(new BorderLayout());
         header.setBackground(new Color(26, 26, 46));
         header.setBorder(BorderFactory.createEmptyBorder(10, 15, 10, 15));
@@ -346,11 +340,9 @@ public class MovieSystemSwingGUI extends JFrame {
         header.add(logo, BorderLayout.WEST);
         header.add(rightHeader, BorderLayout.EAST);
         
-        // Center content
         JPanel centerPanel = new JPanel(new BorderLayout());
         centerPanel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
         
-        // Filter bar
         JPanel filterBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
         
         searchField = new JTextField(20);
@@ -430,7 +422,6 @@ public class MovieSystemSwingGUI extends JFrame {
         filterBar.add(recommendBtn);
         filterBar.add(refreshBtn);
         
-        // Movie table
         String[] columns = {"ID", "Title", "Genre", "Year", "Rating", "Actions"};
         tableModel = new DefaultTableModel(columns, 0) {
             @Override
@@ -448,7 +439,6 @@ public class MovieSystemSwingGUI extends JFrame {
         movieTable.getColumnModel().getColumn(4).setPreferredWidth(60);
         movieTable.getColumnModel().getColumn(5).setPreferredWidth(180);
         
-        // Action buttons in table
         movieTable.getColumnModel().getColumn(5).setCellRenderer(new ButtonRenderer());
         movieTable.getColumnModel().getColumn(5).setCellEditor(new ButtonEditor(new JCheckBox()));
         
@@ -457,7 +447,6 @@ public class MovieSystemSwingGUI extends JFrame {
         centerPanel.add(filterBar, BorderLayout.NORTH);
         centerPanel.add(tableScroll, BorderLayout.CENTER);
         
-        // Right panel - user lists
         JPanel rightPanel = new JPanel();
         rightPanel.setLayout(new BoxLayout(rightPanel, BoxLayout.Y_AXIS));
         rightPanel.setPreferredSize(new Dimension(280, 0));
@@ -523,7 +512,6 @@ public class MovieSystemSwingGUI extends JFrame {
         rightPanel.add(Box.createVerticalStrut(5));
         rightPanel.add(historyScroll);
         
-        // Status bar
         statusLabel = new JLabel("Ready");
         statusLabel.setBorder(BorderFactory.createEmptyBorder(8, 10, 8, 10));
         statusLabel.setBackground(new Color(224, 224, 224));
@@ -534,7 +522,6 @@ public class MovieSystemSwingGUI extends JFrame {
         mainPanel.add(rightPanel, BorderLayout.EAST);
         mainPanel.add(statusLabel, BorderLayout.SOUTH);
         
-        // Load initial data
         refreshMovieTable();
     }
     
@@ -590,7 +577,6 @@ public class MovieSystemSwingGUI extends JFrame {
     
     private void showTopRated() {
         List<MovieData> sorted = new ArrayList<MovieData>(movies);
-        // Manual bubble sort by rating (descending)
         for (int i = 0; i < sorted.size() - 1; i++) {
             for (int j = 0; j < sorted.size() - i - 1; j++) {
                 if (sorted.get(j).getRating() < sorted.get(j + 1).getRating()) {
@@ -657,7 +643,6 @@ public class MovieSystemSwingGUI extends JFrame {
             }
         }
         
-        // Manual bubble sort by rating (descending)
         for (int i = 0; i < recommendations.size() - 1; i++) {
             for (int j = 0; j < recommendations.size() - i - 1; j++) {
                 if (recommendations.get(j).getRating() < recommendations.get(j + 1).getRating()) {
@@ -762,7 +747,6 @@ public class MovieSystemSwingGUI extends JFrame {
         }
     }
     
-    // Button renderer for table
     class ButtonRenderer extends JPanel implements TableCellRenderer {
         private JButton watchlistBtn = new JButton("+ Watchlist");
         private JButton watchedBtn = new JButton("Watched");
@@ -797,7 +781,6 @@ public class MovieSystemSwingGUI extends JFrame {
         }
     }
     
-    // Button editor for table
     class ButtonEditor extends DefaultCellEditor {
         private JPanel panel;
         private JButton watchlistBtn;
@@ -855,7 +838,6 @@ public class MovieSystemSwingGUI extends JFrame {
         }
     }
     
-    // Data classes
     public static class MovieData {
         private String id;
         private String title;

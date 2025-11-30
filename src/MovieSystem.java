@@ -287,7 +287,6 @@ class UserFileHandler {
             String[] idArr = str.split(";");
             for (String id : idArr) {
                 id = id.trim();
-                // Handle history format with date: M001@2025-07-12
                 if (id.contains("@")) {
                     id = id.split("@")[0].trim();
                 }
@@ -319,11 +318,9 @@ class PasswordEncoder {
     }
 
     public static boolean verifyPassword(String rawPassword, String storedPassword) {
-        // First check if password matches as plain text (for pre-existing users)
         if (rawPassword.equals(storedPassword)) {
             return true;
         }
-        // Then check encoded password (for newly registered users)
         String encodedInput = encodePassword(rawPassword);
         return encodedInput.equals(storedPassword);
     }
@@ -367,7 +364,6 @@ public class MovieSystem {
         public int getYear() { return year; }
         public double getRating() { return rating; }
 
-        @Override
         public String toString() {
             return String.format("ID: %s | Title: %-45s | Genre: %-10s | Year: %d | Rating: %.1f",
                     id, title.length() > 45 ? title.substring(0, 42) + "..." : title,
@@ -378,7 +374,6 @@ public class MovieSystem {
             return String.format("%s,%s,%s,%d,%.1f", id, title, genre, year, rating);
         }
 
-        @Override
         public boolean equals(Object obj) {
             if (this == obj) return true;
             if (obj == null || getClass() != obj.getClass()) return false;
@@ -386,7 +381,6 @@ public class MovieSystem {
             return id.equals(movie.id);
         }
 
-        @Override
         public int hashCode() {
             return id.hashCode();
         }
@@ -410,15 +404,10 @@ public class MovieSystem {
                         movies.add(movie);
                     }
                 } catch (Exception e) {
-                    System.out.println("Error parsing movie: " + e.getMessage());
                 }
             }
-            System.out.println("Successfully loaded " + movies.size() + " movies.");
-
         } catch (FileNotFoundException e) {
-            System.out.println("Movie file not found: " + movieFilePath);
         } catch (IOException e) {
-            System.out.println("Error reading movie file: " + e.getMessage());
         }
     }
 
@@ -664,7 +653,6 @@ public class MovieSystem {
         try {
             return reader.readLine();
         } catch (IOException e) {
-            System.out.println("Error reading input: " + e.getMessage());
             return "";
         }
     }
@@ -689,7 +677,6 @@ public class MovieSystem {
                     performRegistration();
                     break;
                 case "3":
-                    System.out.println("Goodbye!");
                     System.exit(0);
                     break;
                 default:
@@ -1083,7 +1070,6 @@ public class MovieSystem {
             return;
         }
 
-        // Analyze user's watching history to find favorite genre
         Map<String, Integer> genreCount = new HashMap<>();
         for (String movieId : historyIds) {
             Movie movie = getMovieById(movieId);
@@ -1093,7 +1079,6 @@ public class MovieSystem {
             }
         }
 
-        // Find the most watched genre
         String favoriteGenre = null;
         int maxCount = 0;
         for (Map.Entry<String, Integer> entry : genreCount.entrySet()) {
@@ -1113,7 +1098,6 @@ public class MovieSystem {
         System.out.println("Based on your watch history, you seem to enjoy " + favoriteGenre + " movies!");
         System.out.println();
 
-        // Get movies from favorite genre that user hasn't watched
         List<Movie> genreMovies = getMoviesByGenre(favoriteGenre);
         List<Movie> recommendations = new ArrayList<>();
 
@@ -1123,7 +1107,6 @@ public class MovieSystem {
             }
         }
 
-        // Sort by rating
         for (int i = 0; i < recommendations.size() - 1; i++) {
             for (int j = i + 1; j < recommendations.size(); j++) {
                 if (recommendations.get(i).getRating() < recommendations.get(j).getRating()) {
