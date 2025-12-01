@@ -1,6 +1,9 @@
 import java.io.*;
 import java.util.*;
-
+/**
+ * Watchlist class - Manages the user's movie watchlist
+ * Stores movie IDs that the user wants to watch
+ */
 class Watchlist {
     private List<String> movieIds;
 
@@ -47,6 +50,9 @@ class Watchlist {
     }
 }
 
+/**
+ * History class - Tracks movies that the user has watched
+ */
 class History {
     private List<String> movieIds;
 
@@ -80,6 +86,10 @@ class History {
     }
 }
 
+/**
+ * User class - Represents a registered user
+ * Contains username, password, watchlist and history
+ */
 class User {
     private String username;
     private String password;
@@ -326,12 +336,15 @@ class PasswordEncoder {
     }
 }
 
+/**
+ * MovieSystem - Main CLI application class for movie browsing and recommendations
+ */
 public class MovieSystem {
-    private List<Movie> movies;
-    private String movieFilePath;
-    private Map<String, List<Movie>> genreMap;
-    private BufferedReader reader;
-    private UserAuthentication userAuth;
+    private List<Movie> movies;                    // List of all movies loaded from CSV
+    private String movieFilePath;                  // Path to movies CSV file
+    private Map<String, List<Movie>> genreMap;     // Map from genre to movies
+    private BufferedReader reader;                 // Console input reader
+    private UserAuthentication userAuth;           // User authentication handler
 
     public MovieSystem() {
         this.movies = new ArrayList<>();
@@ -343,6 +356,7 @@ public class MovieSystem {
         buildGenreMap();
     }
 
+    /** Inner class representing a movie with id, title, genre, year and rating */
     static class Movie {
         protected String id;
         protected String title;
@@ -386,6 +400,7 @@ public class MovieSystem {
         }
     }
 
+    /** Loads all movies from CSV file, skipping the header line */
     public void loadMovies() {
         movies.clear();
         try (BufferedReader br = new BufferedReader(new FileReader(movieFilePath))) {
@@ -703,6 +718,10 @@ public class MovieSystem {
         userAuth.register(username, password);
     }
 
+    /**
+     * Starts the main system with authentication
+     * Show menu in a loop until exit
+     */
     public void startMainSystem() {
         showAuthenticationMenu();
 
@@ -763,6 +782,7 @@ public class MovieSystem {
         }
     }
 
+    /** Sub-menu for managing user's watchlist: view, add, remove, mark as watched */
     private void manageUserWatchlist() {
         User currentUser = userAuth.getCurrentUser();
         Watchlist watchlist = currentUser.getWatchlist();
@@ -842,6 +862,9 @@ public class MovieSystem {
         }
     }
 
+    /**
+     * Sub-menu for viewing and adding movies to user's history
+     */
     private void manageUserHistory() {
         User currentUser = userAuth.getCurrentUser();
         History history = currentUser.getHistory();
@@ -928,14 +951,6 @@ public class MovieSystem {
     }
 
     private void displayWelcomeMessage() {
-        System.out.println("\n" +
-                "  __  __                 _                   \n" +
-                " |  \\/  |               | |                  \n" +
-                " | \\  / | _____   ____ _| |_ ___  _ __ ___   \n" +
-                " | |\\/| |/ _ \\ \\ / / _` | __/ _ \\| '_ ` _ \\  \n" +
-                " | |  | | (_) \\ V / (_| | || (_) | | | | | | \n" +
-                " |_|  |_|\\___/ \\_/ \\__,_|\\__\\___/|_| |_| |_| \n" +
-                "                                            \n");
         System.out.println("Movie database loaded successfully!");
         System.out.println("Ready to explore " + getMovieCount() + " amazing movies!");
     }

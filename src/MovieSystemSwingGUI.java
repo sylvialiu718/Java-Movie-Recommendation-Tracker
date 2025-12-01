@@ -6,13 +6,22 @@ import java.io.*;
 import java.util.*;
 import java.util.List;
 
+/**
+ * MovieSystemSwingGUI - Main GUI application for the Movie Recommendation System
+ * Provides a graphical interface for browsing movies, managing watchlists and viewing history
+ * Built using Java Swing framework
+ */
 public class MovieSystemSwingGUI extends JFrame {
     
+    // Movie data storage
     private List<MovieData> movies = new ArrayList<>();
     private Map<String, List<MovieData>> genreMap = new HashMap<>();
+    
+    // User data and current session
     private Map<String, UserData> userData = new HashMap<>();
     private UserData currentUser = null;
     
+    // UI Components
     private JTable movieTable;
     private DefaultTableModel tableModel;
     private JList<String> watchlistView;
@@ -26,6 +35,7 @@ public class MovieSystemSwingGUI extends JFrame {
     private JPanel mainPanel;
     private JPanel loginPanel;
     
+    // File paths for data persistence
     private static final String MOVIES_FILE = "data/movies.csv";
     private static final String USERS_FILE = "data/users.csv";
     
@@ -59,6 +69,10 @@ public class MovieSystemSwingGUI extends JFrame {
         setVisible(true);
     }
     
+    /**
+     * Loads movie data from CSV file into memory
+     * Parses each line and creates MovieData objects
+     */
     private void loadMovies() {
         movies.clear();
         genreMap.clear();
@@ -98,6 +112,10 @@ public class MovieSystemSwingGUI extends JFrame {
         }
     }
     
+    /**
+     * Loads user data from CSV file
+     * Show username, password, watchlist and history for each user
+     */
     private void loadUsers() {
         userData.clear();
         
@@ -152,6 +170,10 @@ public class MovieSystemSwingGUI extends JFrame {
         }
     }
     
+    /**
+     * Saves all user data to CSV file
+     * Persists watchlists and viewing history
+     */
     private void saveUsers() {
         try (BufferedWriter bw = new BufferedWriter(new FileWriter(USERS_FILE))) {
             bw.write("Username,Password,Watchlist,History");
@@ -166,6 +188,10 @@ public class MovieSystemSwingGUI extends JFrame {
         }
     }
     
+    /**
+     * Creates the login or registration panel
+     * Displayed when the application starts
+     */
     private void createLoginPanel() {
         loginPanel = new JPanel(new GridBagLayout());
         loginPanel.setBackground(new Color(26, 26, 46));
@@ -244,6 +270,10 @@ public class MovieSystemSwingGUI extends JFrame {
         loginPanel.add(formPanel);
     }
     
+    /**
+     * Handles user login authentication
+     * Supports both plain text and encoded passwords for backward compatibility
+     */
     private void handleLogin(String username, String password) {
         if (username.isEmpty() || password.isEmpty()) {
             JOptionPane.showMessageDialog(this, "Please enter username and password", "Error", JOptionPane.ERROR_MESSAGE);
@@ -272,6 +302,10 @@ public class MovieSystemSwingGUI extends JFrame {
         repaint();
     }
     
+    /**
+     * Handles new user registration
+     * Creates new user account with encoded password
+     */
     private void handleRegister(String username, String password) {
         if (username.isEmpty() || password.isEmpty()) {
             JOptionPane.showMessageDialog(this, "Please enter username and password", "Error", JOptionPane.ERROR_MESSAGE);
@@ -290,6 +324,11 @@ public class MovieSystemSwingGUI extends JFrame {
         JOptionPane.showMessageDialog(this, "Registration successful! Please login.", "Success", JOptionPane.INFORMATION_MESSAGE);
     }
     
+    /**
+     * Encodes password using character shifting algorithm
+     * @param raw The plain text password
+     * @return The encoded password string
+     */
     private String encodePassword(String raw) {
         char[] chars = raw.toCharArray();
         for (int i = 0; i < chars.length; i++) {
@@ -838,6 +877,10 @@ public class MovieSystemSwingGUI extends JFrame {
         }
     }
     
+    /**
+     * MovieData class：Represents a movie entity in the GUI
+     * Stores movie attributes: id, title, genre, year, and rating
+     */
     public static class MovieData {
         private String id;
         private String title;
@@ -860,6 +903,10 @@ public class MovieSystemSwingGUI extends JFrame {
         public double getRating() { return rating; }
     }
     
+    /**
+     * UserData class： Represents a user account in the GUI
+     * Stores username, password, watchlist and viewing history
+     */
     public static class UserData {
         private String username;
         private String password;
