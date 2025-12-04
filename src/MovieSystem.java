@@ -487,20 +487,22 @@ public class MovieSystem {
     }
 
     public List<Movie> getTopRatedMovies(int count) {
-        List<Movie> sortedMovies = new ArrayList<>(movies);
-        for (int i = 0; i < sortedMovies.size() - 1; i++) {
-            for (int j = i + 1; j < sortedMovies.size(); j++) {
-                if (sortedMovies.get(i).getRating() < sortedMovies.get(j).getRating()) {
-                    Movie temp = sortedMovies.get(i);
-                    sortedMovies.set(i, sortedMovies.get(j));
-                    sortedMovies.set(j, temp);
+        List<Movie> result = new ArrayList<>();
+        List<Movie> selected = new ArrayList<>();
+
+        for (int i = 0; i < Math.min(count, movies.size()); i++) {
+            Movie best = null;
+            for (Movie movie : movies) {
+                if (!selected.contains(movie)) {
+                    if (best == null || movie.getRating() > best.getRating()) {
+                        best = movie;
+                    }
                 }
             }
-        }
-
-        List<Movie> result = new ArrayList<>();
-        for (int i = 0; i < Math.min(count, sortedMovies.size()); i++) {
-            result.add(sortedMovies.get(i));
+            if (best != null) {
+                result.add(best);
+                selected.add(best);
+            }
         }
         return result;
     }
@@ -515,18 +517,7 @@ public class MovieSystem {
         System.out.println("Available genres: " + getAllGenres().size());
 
         System.out.println("\nMovies by genre:");
-        List<String> genres = new ArrayList<>(genreMap.keySet());
-        for (int i = 0; i < genres.size() - 1; i++) {
-            for (int j = i + 1; j < genres.size(); j++) {
-                if (genreMap.get(genres.get(i)).size() < genreMap.get(genres.get(j)).size()) {
-                    String temp = genres.get(i);
-                    genres.set(i, genres.get(j));
-                    genres.set(j, temp);
-                }
-            }
-        }
-
-        for (String genre : genres) {
+        for (String genre : genreMap.keySet()) {
             System.out.printf("  %-12s: %d movies%n", genre, genreMap.get(genre).size());
         }
 
@@ -638,21 +629,28 @@ public class MovieSystem {
     }
 
     public void displayMoviesSortedByYear() {
-        List<Movie> sortedMovies = new ArrayList<>(movies);
-        for (int i = 0; i < sortedMovies.size() - 1; i++) {
-            for (int j = i + 1; j < sortedMovies.size(); j++) {
-                if (sortedMovies.get(i).getYear() < sortedMovies.get(j).getYear()) {
-                    Movie temp = sortedMovies.get(i);
-                    sortedMovies.set(i, sortedMovies.get(j));
-                    sortedMovies.set(j, temp);
+        List<Movie> result = new ArrayList<>();
+        List<Movie> selected = new ArrayList<>();
+
+        for (int i = 0; i < Math.min(20, movies.size()); i++) {
+            Movie newest = null;
+            for (Movie movie : movies) {
+                if (!selected.contains(movie)) {
+                    if (newest == null || movie.getYear() > newest.getYear()) {
+                        newest = movie;
+                    }
                 }
+            }
+            if (newest != null) {
+                result.add(newest);
+                selected.add(newest);
             }
         }
 
-        System.out.println("\n=== Recent Movies (Sorted by Year) ===");
+        System.out.println("\n=== Recent Movies ===");
         System.out.println("==================================================================================================================");
-        for (int i = 0; i < Math.min(20, sortedMovies.size()); i++) {
-            System.out.println((i + 1) + ". " + sortedMovies.get(i));
+        for (int i = 0; i < result.size(); i++) {
+            System.out.println((i + 1) + ". " + result.get(i));
         }
     }
 
@@ -1124,26 +1122,21 @@ public class MovieSystem {
             }
         }
 
-        for (int i = 0; i < recommendations.size() - 1; i++) {
-            for (int j = i + 1; j < recommendations.size(); j++) {
-                if (recommendations.get(i).getRating() < recommendations.get(j).getRating()) {
-                    Movie temp = recommendations.get(i);
-                    recommendations.set(i, recommendations.get(j));
-                    recommendations.set(j, temp);
-                }
-            }
-        }
-
-        if (recommendations.isEmpty()) {
-            System.out.println("You've watched all " + favoriteGenre + " movies! Try exploring other genres.");
-            return;
-        }
-
-        System.out.println("Recommended " + favoriteGenre + " movies you haven't watched:");
-        System.out.println("==================================================================================================================");
+        List<Movie> selected = new ArrayList<>();
         int count = Math.min(10, recommendations.size());
         for (int i = 0; i < count; i++) {
-            System.out.println((i + 1) + ". " + recommendations.get(i));
+            Movie best = null;
+            for (Movie movie : recommendations) {
+                if (!selected.contains(movie)) {
+                    if (best == null || movie.getRating() > best.getRating()) {
+                        best = movie;
+                    }
+                }
+            }
+            if (best != null) {
+                selected.add(best);
+                System.out.println((i + 1) + ". " + best);
+            }
         }
     }
 
@@ -1151,7 +1144,7 @@ public class MovieSystem {
         System.out.println("\n=== Recommend by Genre ===");
         Set<String> genres = getAllGenres();
         System.out.println("Available genres: ");
-        
+
         List<String> genreList = new ArrayList<>(genres);
         for (int i = 0; i < genreList.size(); i++) {
             System.out.println("  " + (i + 1) + ". " + genreList.get(i));
@@ -1191,22 +1184,20 @@ public class MovieSystem {
             return;
         }
 
-        // Sort by rating
-        List<Movie> sortedMovies = new ArrayList<>(genreMovies);
-        for (int i = 0; i < sortedMovies.size() - 1; i++) {
-            for (int j = i + 1; j < sortedMovies.size(); j++) {
-                if (sortedMovies.get(i).getRating() < sortedMovies.get(j).getRating()) {
-                    Movie temp = sortedMovies.get(i);
-                    sortedMovies.set(i, sortedMovies.get(j));
-                    sortedMovies.set(j, temp);
+        List<Movie> selected = new ArrayList<>();
+        for (int i = 0; i < Math.min(count, genreMovies.size()); i++) {
+            Movie best = null;
+            for (Movie movie : genreMovies) {
+                if (!selected.contains(movie)) {
+                    if (best == null || movie.getRating() > best.getRating()) {
+                        best = movie;
+                    }
                 }
             }
-        }
-
-        System.out.println("\n=== Top " + Math.min(count, sortedMovies.size()) + " " + selectedGenre + " Movies ===");
-        System.out.println("==================================================================================================================");
-        for (int i = 0; i < Math.min(count, sortedMovies.size()); i++) {
-            System.out.println((i + 1) + ". " + sortedMovies.get(i));
+            if (best != null) {
+                selected.add(best);
+                System.out.println((i + 1) + ". " + best);
+            }
         }
     }
 
@@ -1258,21 +1249,20 @@ public class MovieSystem {
             return;
         }
 
-        // Sort by rating
-        for (int i = 0; i < yearMovies.size() - 1; i++) {
-            for (int j = i + 1; j < yearMovies.size(); j++) {
-                if (yearMovies.get(i).getRating() < yearMovies.get(j).getRating()) {
-                    Movie temp = yearMovies.get(i);
-                    yearMovies.set(i, yearMovies.get(j));
-                    yearMovies.set(j, temp);
+        List<Movie> selected = new ArrayList<>();
+        for (int i = 0; i < Math.min(count, yearMovies.size()); i++) {
+            Movie best = null;
+            for (Movie movie : yearMovies) {
+                if (!selected.contains(movie)) {
+                    if (best == null || movie.getRating() > best.getRating()) {
+                        best = movie;
+                    }
                 }
             }
-        }
-
-        System.out.println("\n=== Top " + Math.min(count, yearMovies.size()) + " Movies from " + year + " ===");
-        System.out.println("==================================================================================================================");
-        for (int i = 0; i < Math.min(count, yearMovies.size()); i++) {
-            System.out.println((i + 1) + ". " + yearMovies.get(i));
+            if (best != null) {
+                selected.add(best);
+                System.out.println((i + 1) + ". " + best);
+            }
         }
     }
 
